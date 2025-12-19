@@ -201,15 +201,22 @@
             let pTax = (pGain > 0) ? pGain * taxRate : 0;
             let pRPV = pPrice - pTax;
 
-            // 넷플릭스 (Boot Rule 과세)
+            // 넷플릭스 (성공/실패 시나리오 분리 로직 적용)
+            
+            // 1. 성공 시나리오 (Success Case): 합병 성사 -> 세금 발생
+            // * 미국 Boot Rule: 이익(Gain)과 수령 현금(Boot) 중 작은 값에만 과세
             let nGain = nPrice - costBasis;
             let nCashReceived = nPrice * cashRatio;
             let nTaxableAmount = (nGain > 0) ? Math.min(nGain, nCashReceived) : 0;
             let nTax = nTaxableAmount * taxRate;
+            let nValSuccess = nSuccess - nTax; // 성공 시 가치에서 세금 차감
 
-            let nExpectedVal = (nSuccess * (1 - failRisk)) + (nFail * failRisk);
-            let nPresentVal = nExpectedVal / Math.pow(1 + discountRate, time);
-            let nRPV = nPresentVal - nTax;
+            // 2. 실패 시나리오 (Fail Case): 딜 무산 -> 거래 없음 -> 세금 0원
+            let nValFail = nFail;
+
+            // 3. 기대값 및 현재 가치 할인
+            let nExpectedVal = (nValSuccess * (1 - failRisk)) + (nValFail * failRisk);
+            let nRPV = nExpectedVal / Math.pow(1 + discountRate, time);
 
             // 결과 표시
             document.getElementById('res_pRPV').innerText = '$' + pRPV.toFixed(2);
