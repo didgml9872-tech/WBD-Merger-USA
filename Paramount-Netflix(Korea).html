@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>M&A 시뮬레이터: 한국 서학개미 버전</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #f0f2f5; color: #1f2937; padding: 1rem; }
+        .card { background-color: white; border-radius: 1rem; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
+        .scenario-card { border: 2px solid transparent; transition: all 0.3s ease; }
+        .highlight-win { border-color: #10b981; background-color: #ecfdf5; transform: scale(1.02); }
+        input[type="range"] { width: 100%; height: 6px; background: #e5e7eb; border-radius: 5px; -webkit-appearance: none; cursor: pointer; }
+        input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; background: #4f46e5; border-radius: 50%; cursor: pointer; transition: background .15s ease-in-out; }
+        input[type="range"]::-webkit-slider-thumb:hover { background: #4338ca; }
+        .advanced-section { transition: max-height 0.5s ease-in-out, opacity 0.5s ease-in-out; max-height: 0; opacity: 0; overflow: hidden; }
+        .advanced-section.open { max-height: 1000px; opacity: 1; }
+    </style>
+</head>
+<body onload="calculateKrSim()">
+
+    <div class="max-w-3xl mx-auto">
+        <header class="text-center mb-6">
+            <span class="inline-block px-3 py-1 mb-2 text-xs font-semibold tracking-wider text-indigo-800 uppercase bg-indigo-100 rounded-full">Simulation Type A</span>
+            <h1 class="text-2xl sm:text-3xl font-extrabold text-gray-900 mb-2">한국 서학개미 시점</h1>
+            <p class="text-gray-600 text-sm">"세금 이연 혜택 없음: 넷플릭스 딜 선택 시에도 즉시 과세"</p>
+        </header>
+
+        <div class="card p-6 mb-6 border border-gray-200">
+            <h2 class="text-lg font-bold text-gray-800 mb-4 flex items-center"><i class="fas fa-sliders-h mr-2 text-indigo-500"></i> 내 상황 설정 (기본)</h2>
+            
+            <div class="mb-5">
+                <div class="flex justify-between mb-1">
+                    <label class="text-sm font-semibold text-gray-700">내 WBD 매수 평단가</label>
+                    <span id="disp_myCost" class="text-sm font-bold text-indigo-600">$15.00</span>
+                </div>
+                <input type="range" id="in_myCost" min="5" max="40" step="0.5" value="15.00" oninput="updateUI('in_myCost', 'disp_myCost', '$'); calculateKrSim();">
+                <p class="text-xs text-gray-400 mt-1">평단가가 낮을수록 세금 부담이 커집니다.</p>
+            </div>
+
+            <div class="mb-5">
+                <div class="flex justify-between mb-1">
+                    <label class="text-sm font-semibold text-gray-700">주주 요구 수익률 (연)</label>
+                    <span id="disp_hurdle" class="text-sm font-bold text-indigo-600">7.0%</span>
+                </div>
+                <input type="range" id="in_hurdle" min="0" max="20" step="0.1" value="7.0" oninput="updateUI('in_hurdle', 'disp_hurdle', '%'); calculateKrSim();">
+            </div>
+
+            <div class="mb-5">
+                <div class="flex justify-between mb-1">
+                    <label class="text-sm font-semibold text-gray-700">넷플릭스 딜 무산 확률</label>
+                    <span id="disp_risk" class="text-sm font-bold text-indigo-600">25%</span>
+                </div>
+                <input type="range" id="in_risk" min="0" max="100" step="1" value="25" oninput="updateUI('in_risk', 'disp_risk', '%'); calculateKrSim();">
+            </div>
+
+            <div class="mb-2">
+                <div class="flex justify-between mb-1">
+                    <label class="text-sm font-semibold text-gray-700">
+                        한국 양도소득세율
+                        <span class="text-xs text-gray-400 font-normal ml-1">(기본: 22.0%)</span>
+                    </label>
+                    <span id="disp_taxRate" class="text-sm font-bold text-indigo-600">22.0%</span>
+                </div>
+                <input type="range" id="in_taxRate" min="0" max="30" step="1" value="22.0" oninput="updateUI('in_taxRate', 'disp_taxRate', '%'); calculateKrSim();">
+                <p class="text-xs text-gray-400 mt-1">공제한도(250만원) 미만 시 0%로 설정해보세요.</p>
+            </div>
+
+            <div class="mt-6 border-t pt-4 text-center">
+                <button onclick="toggleAdvanced()" class="text-sm text-gray-500 hover:text-indigo-600 font-medium focus:outline-none transition-colors">
+                    <i id="advIcon" class="fas fa-chevron-down mr-1"></i> 고급 설정 (딜 조건 수정)
+                </button>
+            </div>
+
+            <div id="advancedArea" class="advanced-section bg-gray-50 rounded-lg mt-2 px-4">
+                <div class="py-4 space-y-4">
+                    <div>
+                        <div class="flex justify-between">
+                            <label class="text-xs font-bold text-gray-500">파라마운트 제안가 (현금)</label>
+                            <span id="disp_pPrice" class="text-xs font-bold text-gray-700">$30.00</span>
+                        </div>
+                        <input type="range" id="in_pPrice" min="20" max="40" step="0.5" value="30.00" oninput="updateUI('in_pPrice', 'disp_pPrice', '$'); calculateKrSim();">
+                    </div>
+                    <div>
+                        <div class="flex justify-between">
+                            <label class="text-xs font-bold text-gray-500">넷플릭스 제안가 (합산)</label>
+                            <span id="disp_nPrice" class="text-xs font-bold text-gray-700">$27.75</span>
+                        </div>
+                        <input type="range" id="in_nPrice" min="20" max="40" step="0.25" value="27.75" oninput="updateUI('in_nPrice', 'disp_nPrice', '$'); calculateKrSim();">
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="text-xs font-bold text-gray-500 block mb-1">합병 성공 시 WBD 예상 주가 ($)</label>
+                            <input type="number" id="in_nSuccess" value="32.00" class="w-full text-xs p-1 border rounded" onchange="calculateKrSim()">
+                        </div>
+                        <div>
+                            <label class="text-xs font-bold text-gray-500 block mb-1">합병 무산 시 WBD 예상 주가 ($)</label>
+                            <input type="number" id="in_nFail" value="20.00" class="w-full text-xs p-1 border rounded" onchange="calculateKrSim()">
+                        </div>
+                    </div>
+                    <div>
+                        <div class="flex justify-between">
+                            <label class="text-xs font-bold text-gray-500">투자 기간 (년)</label>
+                            <span id="disp_time" class="text-xs font-bold text-gray-700">1.0 (1년 0개월)</span>
+                        </div>
+                        <input type="range" id="in_time" min="0.5" max="3.0" step="0.25" value="1.0" oninput="updateTimeUI(); calculateKrSim();">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
+            <div id="card_Paramount" class="scenario-card card p-5 relative overflow-hidden">
+                <div class="absolute top-0 right-0 bg-green-100 text-green-800 text-[10px] font-bold px-2 py-1 rounded-bl">즉시 현금</div>
+                <h3 class="font-bold text-gray-700 mb-1">파라마운트 딜</h3>
+                <p class="text-xs text-gray-400 mb-4">세금 떼고 즉시 수령 (T=0)</p>
+                <div class="flex justify-between items-end">
+                    <div>
+                        <span class="text-xs text-gray-500 block">RPV (위험조정가치)</span>
+                        <span id="res_pRPV" class="text-2xl font-extrabold text-gray-800">$0.00</span>
+                    </div>
+                </div>
+            </div>
+
+            <div id="card_Netflix" class="scenario-card card p-5 relative overflow-hidden">
+                <div class="absolute top-0 right-0 bg-red-100 text-red-800 text-[10px] font-bold px-2 py-1 rounded-bl">미래 가치</div>
+                <h3 class="font-bold text-gray-700 mb-1">넷플릭스 딜</h3>
+                <p class="text-xs text-gray-400 mb-4">선납 세금 + 미래 가치 할인 (T=<span id="val_nTime">1.0</span>)</p>
+                <div class="flex justify-between items-end">
+                    <div>
+                        <span class="text-xs text-gray-500 block">RPV (위험조정가치)</span>
+                        <span id="res_nRPV" class="text-2xl font-extrabold text-gray-800">$0.00</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card p-4 bg-gray-100 border border-gray-300 text-gray-900 text-center shadow-lg">
+            <h3 class="text-sm font-bold opacity-75 mb-1 text-gray-500">SIMULATION RESULT</h3>
+            <p id="finalMsg" class="text-lg sm:text-xl font-bold leading-snug">계산 중...</p>
+        </div>
+    </div>
+
+    <script>
+        function toggleAdvanced() {
+            const el = document.getElementById('advancedArea');
+            const icon = document.getElementById('advIcon');
+            el.classList.toggle('open');
+            icon.className = el.classList.contains('open') ? 'fas fa-chevron-up mr-1' : 'fas fa-chevron-down mr-1';
+        }
+
+        function updateUI(id, targetId, suffix) {
+            document.getElementById(targetId).innerText = document.getElementById(id).value + suffix;
+        }
+
+        function updateTimeUI() {
+            const val = parseFloat(document.getElementById('in_time').value);
+            const years = Math.floor(val);
+            const months = Math.round((val - years) * 12);
+            
+            let displayStr = val.toFixed(2);
+            if (months === 0) {
+                displayStr += ` (${years}년)`;
+            } else {
+                displayStr += ` (${years}년 ${months}개월)`;
+            }
+
+            document.getElementById('disp_time').innerText = displayStr;
+            document.getElementById('val_nTime').innerText = val.toFixed(2);
+        }
+
+        function calculateKrSim() {
+            const costBasis = parseFloat(document.getElementById('in_myCost').value);
+            const discountRate = parseFloat(document.getElementById('in_hurdle').value) / 100;
+            const failRisk = parseFloat(document.getElementById('in_risk').value) / 100;
+            const taxRate = parseFloat(document.getElementById('in_taxRate').value) / 100;
+
+            const pPrice = parseFloat(document.getElementById('in_pPrice').value);
+            const nPrice = parseFloat(document.getElementById('in_nPrice').value);
+            const nSuccess = parseFloat(document.getElementById('in_nSuccess').value);
+            const nFail = parseFloat(document.getElementById('in_nFail').value);
+            const time = parseFloat(document.getElementById('in_time').value);
+
+            // 파라마운트 (즉시 과세)
+            let pGain = pPrice - costBasis;
+            let pTax = (pGain > 0) ? pGain * taxRate : 0;
+            let pRPV = pPrice - pTax;
+
+            // 넷플릭스 (즉시 과세 + 미래 할인)
+            let nGain = nPrice - costBasis;
+            let nTax = (nGain > 0) ? nGain * taxRate : 0;
+            
+            let nExpectedVal = (nSuccess * (1 - failRisk)) + (nFail * failRisk);
+            let nPresentVal = nExpectedVal / Math.pow(1 + discountRate, time);
+            let nRPV = nPresentVal - nTax; 
+
+            // 결과 표시
+            document.getElementById('res_pRPV').innerText = '$' + pRPV.toFixed(2);
+            document.getElementById('res_nRPV').innerText = '$' + nRPV.toFixed(2);
+
+            const pCard = document.getElementById('card_Paramount');
+            const nCard = document.getElementById('card_Netflix');
+            const msg = document.getElementById('finalMsg');
+
+            pCard.className = "scenario-card card p-5 relative overflow-hidden";
+            nCard.className = "scenario-card card p-5 relative overflow-hidden";
+
+            let diff = Math.abs(pRPV - nRPV).toFixed(2);
+
+            if (pRPV >= nRPV) {
+                pCard.classList.add('highlight-win', 'border-green-500');
+                msg.innerHTML = `파라마운트(현금)가 <span class="text-green-600">$${diff}</span> 더 유리합니다.<br><span class="text-xs font-normal text-gray-600 opacity-80">한국인은 넷플릭스를 선택해도 세금을 바로 내야 하므로 손해입니다.</span>`;
+            } else {
+                nCard.classList.add('highlight-win', 'border-red-500');
+                msg.innerHTML = `넷플릭스(비전)가 <span class="text-red-600">$${diff}</span> 더 유리합니다.<br><span class="text-xs font-normal text-gray-600 opacity-80">요구수익률이 낮거나 리스크가 매우 낮게 평가된 경우입니다.</span>`;
+            }
+        }
+    </script>
+</body>
+</html>
