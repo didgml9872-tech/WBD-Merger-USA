@@ -188,13 +188,20 @@
             let pTax = (pGain > 0) ? pGain * taxRate : 0;
             let pRPV = pPrice - pTax;
 
-            // 넷플릭스 (즉시 과세 + 미래 할인)
+            // 넷플릭스 (성공/실패 시나리오 분리 로직 적용)
+            
+            // 1. 성공 시나리오 (Success Case): 합병 성사 -> 세금 발생
+            // * 세금은 딜 제안가(nPrice)를 기준으로 발생한다고 가정
             let nGain = nPrice - costBasis;
             let nTax = (nGain > 0) ? nGain * taxRate : 0;
-            
-            let nExpectedVal = (nSuccess * (1 - failRisk)) + (nFail * failRisk);
-            let nPresentVal = nExpectedVal / Math.pow(1 + discountRate, time);
-            let nRPV = nPresentVal - nTax; 
+            let nValSuccess = nSuccess - nTax; // 성공 시 가치에서 세금 차감
+
+            // 2. 실패 시나리오 (Fail Case): 딜 무산 -> 거래 없음 -> 세금 0원
+            let nValFail = nFail;
+
+            // 3. 기대값 및 현재 가치 할인
+            let nExpectedVal = (nValSuccess * (1 - failRisk)) + (nValFail * failRisk);
+            let nRPV = nExpectedVal / Math.pow(1 + discountRate, time);
 
             // 결과 표시
             document.getElementById('res_pRPV').innerText = '$' + pRPV.toFixed(2);
