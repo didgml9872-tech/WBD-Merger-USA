@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>M&A 통합 시뮬레이터: 한국 vs 미국</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; color: #1f2937; padding: 1rem; }
+        .card { background-color: white; border-radius: 1rem; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
+        .scenario-card { border: 2px solid transparent; transition: all 0.3s ease; }
+        .highlight-win { border-color: #10b981; background-color: #ecfdf5; transform: scale(1.02); }
+        input[type="range"] { width: 100%; height: 6px; background: #e5e7eb; border-radius: 5px; -webkit-appearance: none; cursor: pointer; }
+        input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; background: #4f46e5; border-radius: 50%; cursor: pointer; transition: background .15s ease-in-out; }
+        input[type="range"]::-webkit-slider-thumb:hover { background: #4338ca; }
+        .advanced-section { transition: max-height 0.5s ease-in-out, opacity 0.5s ease-in-out; max-height: 0; opacity: 0; overflow: hidden; }
+        .advanced-section.open { max-height: 1000px; opacity: 1; }
+        
+        /* 탭 스타일 */
+        .tab-btn { padding: 12px 20px; font-weight: 700; cursor: pointer; border-bottom: 3px solid transparent; color: #6b7280; flex: 1; text-align: center; transition: all 0.2s; }
+        .tab-btn:hover { background-color: #f9fafb; }
+        .tab-btn.active-kr { border-bottom: 3px solid #4f46e5; color: #4f46e5; background-color: #eef2ff; }
+        .tab-btn.active-us { border-bottom: 3px solid #10b981; color: #059669; background-color: #ecfdf5; }
+        
+        /* 모드별 테마 색상 제어 */
+        .theme-kr .accent-text { color: #4f46e5; }
+        .theme-kr .accent-bg { background-color: #eef2ff; color: #3730a3; }
+        .theme-us .accent-text { color: #059669; }
+        .theme-us .accent-bg { background-color: #ecfdf5; color: #065f46; }
+    </style>
+</head>
+<body onload="init()">
+
+    <div class="max-w-3xl mx-auto">
+        <div class="bg-white rounded-t-xl shadow-sm flex overflow-hidden mb-0 border-b border-gray-200">
+            <div id="tab_kr" class="tab-btn active-kr" onclick="switchTab('KR')">
+                <i class="fas fa-flag text-indigo-500 mr-2"></i>한국 서학개미
+            </div>
+            <div id="tab_us" class="tab-btn" onclick="switchTab('US')">
+                <i class="fas fa-flag-usa text-green-500 mr-2"></i>미국 현지 주주
+            </div>
+        </div>
+
+        <div class="bg-white rounded-b-xl shadow-lg p-6 mb-6 border border-gray-100 theme-kr" id="mainContainer">
+            <header class="text-center mb-6">
+                <span id="badge_sim" class="inline-block px-3 py-1 mb-2 text-xs font-semibold tracking-wider uppercase rounded-full accent-bg">Simulation Type A</span>
+                <h1 id="title_sim" class="text-2xl sm:text-3xl font-extrabold text-gray-900 mb-2">한국 서학개미 시점</h1>
+                <p id="desc_sim" class="text-gray-600 text-sm">"세금 이연 혜택 없음: 넷플릭스 딜 선택 시에도 즉시 과세"</p>
+            </header>
+
+            <div class="card p-6 mb-6 border border-gray-200">
+                <h2 class="text-lg font-bold text-gray-800 mb-4 flex items-center">
+                    <i id="icon_user" class="fas fa-sliders-h mr-2 accent-text"></i> 내 상황 설정
+                </h2>
+                
+                <div class="mb-5">
+                    <div class="flex justify-between mb-1">
+                        <label class="text-sm font-semibold text-gray-700">내 WBD 매수 평단가</label>
+                        <span id="disp_myCost" class="text-sm font-bold accent-text">$15.00</span>
+                    </div>
+                    <input type="range" id="in_myCost" min="5" max="40" step="0.5" value="15.00" oninput="updateAndCalc()">
+                    
+                    <p id="desc_cost_kr" class="text-xs text-gray-400 mt-1">평단가가 낮을수록 세금 부담이 커집니다.</p>
+                    
+                    <div id="desc_cost_us_box" class="mt-2 p-3 bg-blue-50 border border-blue-100 rounded-lg text-xs text-blue-800 leading-relaxed hidden">
+                        <strong class="block mb-1">💡 평단가에 따른 유불리 원리</strong>
+                        평단가가 <strong>낮으면</strong>(이익이 크면) 아낄 세금도 많아서 <strong>넷플릭스(과세 이연)</strong>가 유리하지만,<br>
+                        평단가가 <strong>높으면</strong>(이익이 작으면) 아낄 세금도 별로 없어서 <strong>파라마운트(현금 많이 줌)</strong>가 유리합니다.
+                    </div>
+                </div>
+
+                <div class="mb-5">
+                    <div class="flex justify-between mb-1">
+                        <label class="text-sm font-semibold text-gray-700">주주 요구 수익률 (연)</label>
+                        <span id="disp_hurdle" class="text-sm font-bold accent-text">7.0%</span>
+                    </div>
+                    <input type="range" id="in_hurdle" min="0" max="20" step="0.1" value="7.0" oninput="updateAndCalc()">
+                </div>
+
+                <div class="mb-5">
+                    <div class="flex justify-between mb-1">
+                        <label class="text-sm font-semibold text-gray-700">넷플릭스 딜 무산 확률</label>
+                        <span id="disp_risk" class="text-sm font-bold accent-text">25%</span>
+                    </div>
+                    <input type="range" id="in_risk" min="0" max="100" step="1" value="25" oninput="updateAndCalc()">
+                </div>
+
+                <div id="area_cashRatio" class="mb-5 hidden">
+                    <div class="flex justify-between mb-1">
+                        <label class="text-sm font-semibold text-gray-700">넷플릭스 딜 현금 비중 (Boot)</label>
+                        <span id="disp_cashRatio" class="text-sm font-bold accent-text">20%</span>
+                    </div>
+                    <input type="range" id="in_cashRatio" min="0" max="100" step="5" value="20" oninput="updateAndCalc()">
+                    <p class="text-xs text-gray-400 mt-1">미국 주주는 오직 받은 현금(Boot)에 대해서만 세금을 냅니다.</p>
+                </div>
+
+                <div id="area_tax_kr" class="mb-2">
+                    <div class="flex justify-between mb-1">
+                        <label class="text-sm font-semibold text-gray-700">
+                            한국 양도소득세율
+                            <span class="text-xs text-gray-400 font-normal ml-1">(기본: 22.0%)</span>
+                        </label>
+                        <span id="disp_taxRate_kr" class="text-sm font-bold accent-text">22.0%</span>
+                    </div>
+                    <input type="range" id="in_taxRate_kr" min="0" max="40" step="0.1" value="22.0" oninput="updateAndCalc()">
+                    <p class="text-xs text-gray-400 mt-1">공제한도(250만원) 미만 시 0%로 설정해보세요.</p>
+                </div>
+
+                <div class="mt-6 border-t pt-4 text-center">
+                    <button onclick="toggleAdvanced()" class="text-sm text-gray-500 hover:text-indigo-600 font-medium focus:outline-none transition-colors">
+                        <i id="advIcon" class="fas fa-chevron-down mr-1"></i> 고급 설정 (딜 조건 수정)
+                    </button>
+                </div>
+
+                <div id="advancedArea" class="advanced-section bg-gray-50 rounded-lg mt-2 px-4">
+                    <div class="py-4 space-y-4">
+                        
+                        <div>
+                            <div class="flex justify-between">
+                                <label class="text-xs font-bold text-gray-500">파라마운트 제안가 (현금)</label>
+                                <span id="disp_pPrice" class="text-xs font-bold text-gray-700">$30.00</span>
+                            </div>
+                            <input type="range" id="in_pPrice" min="20" max="40" step="0.5" value="30.00" oninput="updateAndCalc()">
+                        </div>
+                        <div>
+                            <div class="flex justify-between">
+                                <label class="text-xs font-bold text-gray-500">넷플릭스 제안가 (합산)</label>
+                                <span id="disp_nPrice" class="text-xs font-bold text-gray-700">$27.75</span>
+                            </div>
+                            <input type="range" id="in_nPrice" min="20" max="40" step="0.25" value="27.75" oninput="updateAndCalc()">
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="text-xs font-bold text-gray-500 block mb-1">성공 시 WBD 주가 ($)</label>
+                                <input type="number" id="in_nSuccess" value="32.00" class="w-full text-xs p-1 border rounded" onchange="updateAndCalc()">
+                            </div>
+                            <div>
+                                <label class="text-xs font-bold text-gray-500 block mb-1">무산 시 WBD 주가 ($)</label>
+                                <input type="number" id="in_nFail" value="20.00" class="w-full text-xs p-1 border rounded" onchange="updateAndCalc()">
+                            </div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between">
+                                <label class="text-xs font-bold text-gray-500">투자 기간 (년)</label>
+                                <span id="disp_time" class="text-xs font-bold text-gray-700">1.0 (1년 0개월)</span>
+                            </div>
+                            <input type="range" id="in_time" min="0.5" max="3.0" step="0.25" value="1.0" oninput="updateAndCalc()">
+                        </div>
+
+                        <div id="area_tax_us" class="hidden">
+                            <div class="flex justify-between mb-1">
+                                <label class="text-xs font-bold text-gray-500">
+                                    미국 주주 세율 (LTCG+NIIT)
+                                    <span class="text-[10px] text-gray-400 font-normal ml-1">(기본: 23.8%)</span>
+                                </label>
+                                <span id="disp_taxRate_us" class="text-xs font-bold text-gray-700">23.8%</span>
+                            </div>
+                            <input type="range" id="in_taxRate_us" min="0" max="40" step="0.1" value="23.8" oninput="updateAndCalc()">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
+                <div id="card_Paramount" class="scenario-card card p-5 relative overflow-hidden">
+                    <div class="absolute top-0 right-0 bg-green-100 text-green-800 text-[10px] font-bold px-2 py-1 rounded-bl">즉시 현금</div>
+                    <h3 class="font-bold text-gray-700 mb-1">파라마운트 딜</h3>
+                    <p id="desc_para_sub" class="text-xs text-gray-400 mb-4">세금 떼고 즉시 수령 (T=0)</p>
+                    <div class="flex justify-between items-end">
+                        <div>
+                            <span class="text-xs text-gray-500 block">RPV (위험조정가치)</span>
+                            <span id="res_pRPV" class="text-2xl font-extrabold text-gray-800">$0.00</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="card_Netflix" class="scenario-card card p-5 relative overflow-hidden">
+                    <div class="absolute top-0 right-0 bg-red-100 text-red-800 text-[10px] font-bold px-2 py-1 rounded-bl">미래 가치</div>
+                    <h3 class="font-bold text-gray-700 mb-1">넷플릭스 딜</h3>
+                    <p id="desc_net_sub" class="text-xs text-gray-400 mb-4">선납 세금 + 미래 가치 할인</p>
+                    <div class="flex justify-between items-end">
+                        <div>
+                            <span class="text-xs text-gray-500 block">RPV (위험조정가치)</span>
+                            <span id="res_nRPV" class="text-2xl font-extrabold text-gray-800">$0.00</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card p-4 bg-gray-100 border border-gray-300 text-gray-900 text-center shadow-lg">
+                <h3 class="text-sm font-bold opacity-75 mb-1 text-gray-500">SIMULATION RESULT</h3>
+                <p id="finalMsg" class="text-lg sm:text-xl font-bold leading-snug">계산 중...</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentMode = 'KR'; // 'KR' or 'US'
+
+        function init() {
+            // 초기화: 한국 모드
+            switchTab('KR');
+        }
+
+        function switchTab(mode) {
+            currentMode = mode;
+            const container = document.getElementById('mainContainer');
+            
+            if (mode === 'KR') {
+                // 탭 스타일
+                document.getElementById('tab_kr').className = 'tab-btn active-kr';
+                document.getElementById('tab_us').className = 'tab-btn';
+                
+                // 테마 클래스
+                container.classList.remove('theme-us');
+                container.classList.add('theme-kr');
+
+                // 텍스트 및 입력창 설정
+                document.getElementById('badge_sim').innerText = 'Simulation Type A';
+                document.getElementById('title_sim').innerText = '한국 서학개미 시점';
+                document.getElementById('desc_sim').innerText = '"세금 이연 혜택 없음: 넷플릭스 딜 선택 시에도 즉시 과세"';
+                document.getElementById('icon_user').className = 'fas fa-sliders-h mr-2 accent-text';
+                
+                // 평단가 설명 교체
+                document.getElementById('desc_cost_kr').classList.remove('hidden');
+                document.getElementById('desc_cost_us_box').classList.add('hidden');
+
+                // 현금 비중 숨김
+                document.getElementById('area_cashRatio').classList.add('hidden'); 
+
+                // 세금 슬라이더 위치 제어 (한국: 메인 / 미국: 고급-맨아래)
+                document.getElementById('area_tax_kr').classList.remove('hidden');
+                document.getElementById('area_tax_us').classList.add('hidden');
+
+                // 하단 카드 설명
+                document.getElementById('desc_para_sub').innerText = '세금 떼고 즉시 수령 (T=0)';
+                document.getElementById('desc_net_sub').innerHTML = '선납 세금 + 미래 가치 할인 (T=<span id="val_nTime_kr">1.0</span>)';
+
+            } else { // US Mode
+                // 탭 스타일
+                document.getElementById('tab_kr').className = 'tab-btn';
+                document.getElementById('tab_us').className = 'tab-btn active-us';
+                
+                // 테마 클래스
+                container.classList.remove('theme-kr');
+                container.classList.add('theme-us');
+
+                // 텍스트 및 입력창 설정
+                document.getElementById('badge_sim').innerText = 'Simulation Type B';
+                document.getElementById('title_sim').innerText = '미국 현지 주주 시점';
+                document.getElementById('desc_sim').innerText = '"세금 이연(Tax Deferral) 혜택: 넷플릭스 주식분은 비과세"';
+                document.getElementById('icon_user').className = 'fas fa-user-tie mr-2 accent-text';
+
+                // 평단가 설명 교체 (원문 복구된 박스 보임)
+                document.getElementById('desc_cost_kr').classList.add('hidden');
+                document.getElementById('desc_cost_us_box').classList.remove('hidden');
+
+                // 현금 비중 보임
+                document.getElementById('area_cashRatio').classList.remove('hidden'); 
+
+                // 세금 슬라이더 위치 제어 (한국: 숨김 / 미국: 고급 설정 안으로)
+                document.getElementById('area_tax_kr').classList.add('hidden');
+                document.getElementById('area_tax_us').classList.remove('hidden');
+
+                // 하단 카드 설명
+                document.getElementById('desc_para_sub').innerText = '전액 과세 후 수령 (T=0)';
+                document.getElementById('desc_net_sub').innerHTML = '주식교환분 비과세 + 현금수령분 과세 (T=<span id="val_nTime_us">1.0</span>)';
+            }
+
+            updateAndCalc(); // 값 업데이트 및 계산 실행
+        }
+
+        function toggleAdvanced() {
+            const el = document.getElementById('advancedArea');
+            const icon = document.getElementById('advIcon');
+            el.classList.toggle('open');
+            icon.className = el.classList.contains('open') ? 'fas fa-chevron-up mr-1' : 'fas fa-chevron-down mr-1';
+        }
+
+        function updateAndCalc() {
+            // UI 업데이트 (숫자 표시)
+            const inputIds = ['in_myCost', 'in_hurdle', 'in_risk', 'in_pPrice', 'in_nPrice', 'in_cashRatio'];
+            const suffixes = {'in_myCost':'$', 'in_hurdle':'%', 'in_risk':'%', 'in_pPrice':'$', 'in_nPrice':'$', 'in_cashRatio':'%'};
+            
+            inputIds.forEach(id => {
+                const el = document.getElementById(id);
+                const disp = document.getElementById(id.replace('in_', 'disp_'));
+                if(disp) disp.innerText = el.value + suffixes[id];
+            });
+
+            // 세금 슬라이더 UI (모드에 따라 다른 ID 사용)
+            if (currentMode === 'KR') {
+                 document.getElementById('disp_taxRate_kr').innerText = document.getElementById('in_taxRate_kr').value + '%';
+            } else {
+                 document.getElementById('disp_taxRate_us').innerText = document.getElementById('in_taxRate_us').value + '%';
+            }
+
+            // 시간 UI 업데이트
+            const timeVal = parseFloat(document.getElementById('in_time').value);
+            const years = Math.floor(timeVal);
+            const months = Math.round((timeVal - years) * 12);
+            let timeStr = timeVal.toFixed(2);
+            timeStr += (months === 0) ? ` (${years}년)` : ` (${years}년 ${months}개월)`;
+            document.getElementById('disp_time').innerText = timeStr;
+            
+            // 모드별 하단 시간 표시 업데이트
+            const timeTarget = currentMode === 'KR' ? document.getElementById('val_nTime_kr') : document.getElementById('val_nTime_us');
+            if(timeTarget) timeTarget.innerText = timeVal.toFixed(2);
+
+            // 계산 로직 분기
+            if (currentMode === 'KR') {
+                calculateKrSim();
+            } else {
+                calculateUsSim();
+            }
+        }
+
+        // ==========================================
+        // [Logic 1] 한국 서학개미 계산 로직
+        // ==========================================
+        function calculateKrSim() {
+            const costBasis = parseFloat(document.getElementById('in_myCost').value);
+            const discountRate = parseFloat(document.getElementById('in_hurdle').value) / 100;
+            const failRisk = parseFloat(document.getElementById('in_risk').value) / 100;
+            const taxRate = parseFloat(document.getElementById('in_taxRate_kr').value) / 100; // 한국 전용 ID
+            const pPrice = parseFloat(document.getElementById('in_pPrice').value);
+            const nPrice = parseFloat(document.getElementById('in_nPrice').value);
+            const nSuccess = parseFloat(document.getElementById('in_nSuccess').value);
+            const nFail = parseFloat(document.getElementById('in_nFail').value);
+            const time = parseFloat(document.getElementById('in_time').value);
+
+            // 파라마운트 (즉시 과세)
+            let pGain = pPrice - costBasis;
+            let pTax = (pGain > 0) ? pGain * taxRate : 0;
+            let pRPV = pPrice - pTax;
+
+            // 넷플릭스 (성공 시 전체 과세)
+            let nGain = nPrice - costBasis;
+            let nTax = (nGain > 0) ? nGain * taxRate : 0;
+            let nValSuccess = nSuccess - nTax; 
+            let nValFail = nFail;
+
+            let nExpectedVal = (nValSuccess * (1 - failRisk)) + (nValFail * failRisk);
+            let nRPV = nExpectedVal / Math.pow(1 + discountRate, time);
+
+            renderResults(pRPV, nRPV, 'KR');
+        }
+
+        // ==========================================
+        // [Logic 2] 미국 주주 계산 로직
+        // ==========================================
+        function calculateUsSim() {
+            const costBasis = parseFloat(document.getElementById('in_myCost').value);
+            const discountRate = parseFloat(document.getElementById('in_hurdle').value) / 100;
+            const failRisk = parseFloat(document.getElementById('in_risk').value) / 100;
+            const cashRatio = parseFloat(document.getElementById('in_cashRatio').value) / 100;
+            const taxRate = parseFloat(document.getElementById('in_taxRate_us').value) / 100; // 미국 전용 ID
+            const pPrice = parseFloat(document.getElementById('in_pPrice').value);
+            const nPrice = parseFloat(document.getElementById('in_nPrice').value);
+            const nSuccess = parseFloat(document.getElementById('in_nSuccess').value);
+            const nFail = parseFloat(document.getElementById('in_nFail').value);
+            const time = parseFloat(document.getElementById('in_time').value);
+
+            // 파라마운트 (전액 과세)
+            let pGain = pPrice - costBasis;
+            let pTax = (pGain > 0) ? pGain * taxRate : 0;
+            let pRPV = pPrice - pTax;
+
+            // 넷플릭스 (Boot Rule 적용)
+            let nGain = nPrice - costBasis;
+            let nCashReceived = nPrice * cashRatio;
+            let nTaxableAmount = (nGain > 0) ? Math.min(nGain, nCashReceived) : 0; // 핵심 로직
+            let nTax = nTaxableAmount * taxRate;
+            let nValSuccess = nSuccess - nTax;
+            let nValFail = nFail;
+
+            let nExpectedVal = (nValSuccess * (1 - failRisk)) + (nValFail * failRisk);
+            let nRPV = nExpectedVal / Math.pow(1 + discountRate, time);
+
+            renderResults(pRPV, nRPV, 'US');
+        }
+
+        function renderResults(pRPV, nRPV, mode) {
+            document.getElementById('res_pRPV').innerText = '$' + pRPV.toFixed(2);
+            document.getElementById('res_nRPV').innerText = '$' + nRPV.toFixed(2);
+
+            const pCard = document.getElementById('card_Paramount');
+            const nCard = document.getElementById('card_Netflix');
+            const msg = document.getElementById('finalMsg');
+
+            pCard.className = "scenario-card card p-5 relative overflow-hidden";
+            nCard.className = "scenario-card card p-5 relative overflow-hidden";
+
+            let diff = Math.abs(pRPV - nRPV).toFixed(2);
+            let winColor = mode === 'KR' ? 'text-green-600' : 'text-green-600'; 
+
+            if (pRPV >= nRPV) {
+                pCard.classList.add('highlight-win', 'border-green-500');
+                if (mode === 'KR') {
+                    msg.innerHTML = `파라마운트(현금)가 <span class="${winColor}">$${diff}</span> 더 유리합니다.<br><span class="text-xs font-normal text-gray-600 opacity-80">한국인은 넷플릭스를 선택해도 세금을 바로 내야 하므로 손해입니다.</span>`;
+                } else {
+                    msg.innerHTML = `파라마운트가 <span class="${winColor}">$${diff}</span> 더 유리합니다.<br><span class="text-xs font-normal text-gray-600 opacity-80">평단가가 높아서($25↑) 세금 혜택 효과가 미미하기 때문입니다.</span>`;
+                }
+            } else {
+                nCard.classList.add('highlight-win', 'border-red-500');
+                if (mode === 'KR') {
+                    msg.innerHTML = `넷플릭스(비전)가 <span class="text-red-600">$${diff}</span> 더 유리합니다.<br><span class="text-xs font-normal text-gray-600 opacity-80">요구수익률이 낮거나 리스크가 매우 낮게 평가된 경우입니다.</span>`;
+                } else {
+                    msg.innerHTML = `넷플릭스가 <span class="text-red-600">$${diff}</span> 더 유리합니다.<br><span class="text-xs font-normal text-gray-600 opacity-80">낮은 평단가 덕분에 '과세 이연' 효과가 극대화되었습니다! (이사회 논리)</span>`;
+                }
+            }
+        }
+    </script>
+</body>
+</html>
